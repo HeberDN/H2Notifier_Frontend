@@ -3,8 +3,6 @@
 import axios from 'axios';
 import { Pessoa, PessoaInput, ApiResponse } from '../types/Pessoa'; // Importa os tipos definidos
 
-const API_URL = 'http://localhost:8080/api/v1/pessoas'; // URL base da sua API de Pessoas
-
 // Configuração do Axios para a base da API
 // IMPORTANTE: Aqui, 'api' é uma instância local para pessoaService.
 // O ideal é usar a instância global 'api' de 'src/services/api.ts' para reuso.
@@ -70,7 +68,8 @@ export const pessoaService = {
   deletePessoa: async (id: number): Promise<ApiResponse<null>> => {
     try {
       const response = await api.delete<ApiResponse<null>>(`/pessoas/${id}`);
-      return response.data;
+      console.log(response.data);
+      return response.data || { success: true, message: 'Pessoa deletada com sucesso.', data: null };
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
         throw new Error(error.response.data.message || `Erro ao excluir pessoa com ID ${id}`);

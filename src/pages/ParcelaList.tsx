@@ -1,6 +1,6 @@
 // src/pages/ParcelaList.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Importe useEffect
 import {
   useGetAllParcelas,
   useGetParcelasByVencimento,
@@ -33,8 +33,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '../components/ui/alert-dialog';
+
 import { Parcela, ParcelaInput } from '../types/Parcela';
-import { toast } from 'sonner'; // Se você tiver o shadcn/ui toast configurado
+import { formatarDataParaPtBR, formatarMoedaParaPtBR } from '../utils/formatters';
+import { useGetAllPessoas } from '../features/pessoas/hooks/usePessoaData';
+import { toast } from 'sonner';
 
 // Componente de Formulário para Criar/Editar Parcela (separado para organização)
 interface ParcelaFormProps {
@@ -42,8 +56,9 @@ interface ParcelaFormProps {
   onSubmit: (data: ParcelaInput) => void;
   onCancel: () => void;
   isSubmitting: boolean;
-  cobradorOptions: { id: number; nome: string }[]; // Para selecionar cobrador
-  devedorOptions: { id: number; nome: string }[]; // Para selecionar devedores
+  cobradorOptions: { id: number; nome: string }[];
+  devedorOptions: { id: number; nome: string }[];
+  isEditing: boolean;
 }
 
 const ParcelaForm: React.FC<ParcelaFormProps> = ({
@@ -53,18 +68,35 @@ const ParcelaForm: React.FC<ParcelaFormProps> = ({
   isSubmitting,
   cobradorOptions,
   devedorOptions,
+  isEditing, // Receba a prop isEditing
 }) => {
   const [formData, setFormData] = useState<ParcelaInput>(
     initialData || {
-      idCobrador: cobradorOptions[0]?.id || 0, // Default para o primeiro cobrador
+      idCobrador: cobradorOptions[0]?.id || 0,
       valorTotal: 0,
       descricao: '',
-      vencimento: new Date().toISOString().split('T')[0], // Data atual padrão
+      vencimento: new Date().toISOString().split('T')[0],
       quitada: false,
       chavePix: '',
       idsDevedores: [],
     }
   );
+
+  // Use useEffect para redefinir o formData quando initialData mudar (para o caso de reabrir o modal para criar após editar)
+  useEffect(() => {
+    setFormData(
+      initialData || {
+        idCobrador: cobradorOptions[0]?.id || 0,
+        valorTotal: 0,
+        descricao: '',
+        vencimento: new Date().toISOString().split('T')[0],
+        quitada: false,
+        chavePix: '',
+        idsDevedores: [],
+      }
+    );
+  }, [initialData, cobradorOptions]);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { id, value, type, checked } = e.target as HTMLInputElement;
@@ -142,7 +174,7 @@ const ParcelaForm: React.FC<ParcelaFormProps> = ({
         <select
           id="idsDevedores"
           multiple
-          value={formData.idsDevedores.map(String)} // IDs como string para o select
+          value={formData.idsDevedores.map(String)}
           onChange={handleDevedoresChange}
           className="flex h-fit w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600"
         >
@@ -177,12 +209,13 @@ const ParcelaForm: React.FC<ParcelaFormProps> = ({
           Cancelar
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Salvando...' : 'Salvar Parcela'}
+          {isSubmitting ? 'Salvando...' : (isEditing ? 'Atualizar Parcela' : 'Salvar Parcela')}
         </Button>
       </DialogFooter>
     </form>
   );
 };
+
 
 const ParcelaList: React.FC = () => {
   const [vencimentoDate, setVencimentoDate] = useState<string>('');
@@ -191,22 +224,19 @@ const ParcelaList: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editParcelaData, setEditParcelaData] = useState<Parcela | null>(null);
 
-  // Dados para os dropdowns de cobradores e devedores no formulário (mock ou buscar da API de pessoas)
-  // POR FAVOR, AJUSTE ISSO PARA BUSCAR DADOS REAIS DA SUA API DE PESSOAS!
-  const cobradorOptions = [
-    { id: 1, nome: 'Heber (Cobrador)' },
-    { id: 4, nome: 'Maria (Cobrador)' },
-  ];
-  const devedorOptions = [
-    { id: 2, nome: 'Heber (Devedor)' },
-    { id: 3, nome: 'Hellen (Devedor)' },
-    { id: 5, nome: 'João (Devedor)' },
-  ];
-  // EXEMPLO: Para buscar dados reais:
-  // import { useGetAllPessoas } from '../../features/pessoas/hooks/usePessoaData';
-  // const { data: pessoas, isLoading: isLoadingPessoas } = useGetAllPessoas();
-  // const cobradorOptions = pessoas?.filter(p => p.tipoPessoa === 'COBRADOR').map(p => ({ id: p.id, nome: p.nome })) || [];
-  // const devedorOptions = pessoas?.filter(p => p.tipoPessoa === 'DEVEDOR').map(p => ({ id: p.id, nome: p.nome })) || [];
+  // Estados para o AlertDialog de deleção
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [parcelaToDeleteId, setParcelaToDeleteId] = useState<number | null>(null);
+
+  // Estados para o AlertDialog de quitação
+  const [showQuitarConfirm, setShowQuitarConfirm] = useState(false);
+  const [parcelaToQuitarId, setParcelaToQuitarId] = useState<number | null>(null);
+
+
+  // Dados para os dropdowns de cobradores e devedores no formulário
+  const { data: pessoas, isLoading: isLoadingPessoas } = useGetAllPessoas();
+  const cobradorOptions = pessoas?.filter(p => p.tipoPessoa === 'COBRADOR').map(p => ({ id: p.id, nome: p.nome })) || [];
+  const devedorOptions = pessoas?.filter(p => p.tipoPessoa === 'DEVEDOR').map(p => ({ id: p.id, nome: p.nome })) || [];
 
 
   // Hooks para as listagens
@@ -278,16 +308,8 @@ const ParcelaList: React.FC = () => {
   };
 
   const handleEditParcela = (parcela: Parcela) => {
-    setEditParcelaData({
-      idCobrador: parcela.cobrador.id,
-      valorTotal: parcela.valorTotal,
-      descricao: parcela.descricao,
-      vencimento: parcela.vencimento,
-      quitada: parcela.quitada,
-      chavePix: parcela.chavePix,
-      idsDevedores: parcela.devedores.map(d => d.id),
-    });
-    setShowCreateModal(true); // Reusa o modal de criação para edição
+    setEditParcelaData(parcela);
+    setShowCreateModal(true);
   };
 
   const handleUpdateParcela = async (data: ParcelaInput) => {
@@ -296,31 +318,47 @@ const ParcelaList: React.FC = () => {
       await updateMutation.mutateAsync({ id: editParcelaData.id, data });
       toast.success('Parcela atualizada com sucesso!');
       setShowCreateModal(false);
-      setEditParcelaData(null);
+      setEditParcelaData(null); // Limpar dados de edição após sucesso
     } catch (error: any) {
       toast.error(`Erro ao atualizar parcela: ${error.message}`);
     }
   };
 
-  const handleQuitarParcela = async (id: number) => {
-    if (window.confirm('Tem certeza que deseja quitar esta parcela?')) {
-      try {
-        await quitarMutation.mutateAsync(id);
-        toast.success('Parcela quitada com sucesso!');
-      } catch (error: any) {
-        toast.error(`Erro ao quitar parcela: ${error.message}`);
-      }
+  const confirmQuitarParcela = (id: number) => {
+    setParcelaToQuitarId(id);
+    setShowQuitarConfirm(true);
+  }
+
+  const executeQuitarParcela = async () => {
+    if (parcelaToQuitarId === null) return;
+    try {
+      await quitarMutation.mutateAsync(parcelaToQuitarId);
+      toast.success('Parcela quitada com sucesso!');
+    } catch (error: any) {
+      toast.error(`Erro ao quitar parcela: ${error.message}`);
+    } finally {
+      setShowQuitarConfirm(false);
+      setParcelaToQuitarId(null);
     }
+  }
+
+  // Funções para lidar com o AlertDialog de deleção
+  const confirmDeleteParcela = (id: number) => {
+    setParcelaToDeleteId(id);
+    setShowDeleteConfirm(true);
   };
 
-  const handleDeleteParcela = async (id: number) => {
-    if (window.confirm('Tem certeza que deseja deletar esta parcela? Esta ação é irreversível.')) {
-      try {
-        await deleteMutation.mutateAsync(id);
-        toast.success('Parcela deletada com sucesso!');
-      } catch (error: any) {
-        toast.error(`Erro ao deletar parcela: ${error.message}`);
-      }
+  const executeDeleteParcela = async () => {
+    if (parcelaToDeleteId === null) return;
+
+    try {
+      await deleteMutation.mutateAsync(parcelaToDeleteId);
+      toast.success('Parcela deletada com sucesso!');
+    } catch (error: any) {
+      toast.error(`Erro ao deletar parcela: ${error.message}`);
+    } finally {
+      setShowDeleteConfirm(false);
+      setParcelaToDeleteId(null);
     }
   };
 
@@ -363,14 +401,20 @@ const ParcelaList: React.FC = () => {
       <h2 className="text-3xl font-semibold text-gray-800 dark:text-gray-100 mb-6">Gerenciar Parcelas</h2>
 
       {/* Botão de Adicionar Nova Parcela */}
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+      <Dialog
+        open={showCreateModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            // Se o modal estiver fechando
+            setEditParcelaData(null); // Limpar os dados de edição
+          }
+          setShowCreateModal(open);
+        }}
+      >
         <DialogTrigger asChild>
           <Button
             className="mb-6 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800"
-            onClick={() => {
-              setEditParcelaData(null); // Reset para criar nova
-              setShowCreateModal(true);
-            }}
+            onClick={() => setEditParcelaData(null)} // Garante que os dados de edição sejam limpos ao abrir para criar
           >
             Adicionar Nova Parcela
           </Button>
@@ -383,12 +427,24 @@ const ParcelaList: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           <ParcelaForm
-            initialData={editParcelaData ? { ...editParcelaData, idsDevedores: editParcelaData.devedores.map(d => d.id), idCobrador: editParcelaData.cobrador.id } : undefined}
+            initialData={editParcelaData ? {
+              idCobrador: editParcelaData.cobrador.id,
+              valorTotal: editParcelaData.valorTotal,
+              descricao: editParcelaData.descricao,
+              vencimento: editParcelaData.vencimento,
+              quitada: editParcelaData.quitada,
+              chavePix: editParcelaData.chavePix,
+              idsDevedores: editParcelaData.devedores.map(d => d.id),
+            } : undefined}
             onSubmit={editParcelaData ? handleUpdateParcela : handleCreateParcela}
-            onCancel={() => setShowCreateModal(false)}
+            onCancel={() => {
+              setShowCreateModal(false);
+              setEditParcelaData(null); // Garante que os dados de edição sejam limpos ao cancelar
+            }}
             isSubmitting={createMutation.isPending || updateMutation.isPending}
             cobradorOptions={cobradorOptions}
             devedorOptions={devedorOptions}
+            isEditing={!!editParcelaData} // Passa a prop isEditing
           />
         </DialogContent>
       </Dialog>
@@ -414,7 +470,7 @@ const ParcelaList: React.FC = () => {
           {isErrorTotal && <p className="text-red-600 dark:text-red-400">Erro: {errorTotal?.message}</p>}
           {totalAReceber !== undefined && !isLoadingTotal && !isErrorTotal && (
             <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-              Total: R$ {totalAReceber.toFixed(2)}
+              Total: {formatarMoedaParaPtBR(totalAReceber)}
             </p>
           )}
         </CardContent>
@@ -504,8 +560,8 @@ const ParcelaList: React.FC = () => {
                     <TableRow key={parcela.id} className="dark:hover:bg-gray-750">
                       <TableCell className="font-medium">{parcela.id}</TableCell>
                       <TableCell>{parcela.descricao}</TableCell>
-                      <TableCell>{parcela.vencimento}</TableCell>
-                      <TableCell>R$ {parcela.valorTotal.toFixed(2)}</TableCell>
+                      <TableCell>{formatarDataParaPtBR(parcela.vencimento)}</TableCell>
+                      <TableCell>{formatarMoedaParaPtBR(parcela.valorTotal)}</TableCell>
                       <TableCell>
                         <span
                           className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -531,25 +587,25 @@ const ParcelaList: React.FC = () => {
                           Editar
                         </Button>
                         {!parcela.quitada && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => handleQuitarParcela(parcela.id)}
-                            disabled={quitarMutation.isPending}
-                            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800"
-                          >
-                            Quitar
-                          </Button>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => confirmQuitarParcela(parcela.id)}
+                              disabled={quitarMutation.isPending}
+                              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800"
+                            >
+                              Quitar
+                            </Button>
                         )}
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteParcela(parcela.id)}
-                          disabled={deleteMutation.isPending}
-                          className="dark:bg-red-700 dark:hover:bg-red-800"
-                        >
-                          Deletar
-                        </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => confirmDeleteParcela(parcela.id)}
+                            disabled={deleteMutation.isPending}
+                            className="dark:bg-red-700 dark:hover:bg-red-800"
+                          >
+                            Deletar
+                          </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -563,6 +619,61 @@ const ParcelaList: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* AlertDialog para Confirmação de Deleção */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="dark:bg-gray-800 dark:text-gray-100">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Isso deletará permanentemente a parcela
+              e removerá seus dados de nossos servidores.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={deleteMutation.isPending}
+              className="dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeDeleteParcela}
+              disabled={deleteMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+            >
+              {deleteMutation.isPending ? 'Deletando...' : 'Deletar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AlertDialog para Confirmação de Quitação */}
+      <AlertDialog open={showQuitarConfirm} onOpenChange={setShowQuitarConfirm}>
+        <AlertDialogContent className="dark:bg-gray-800 dark:text-gray-100">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Quitar Parcela?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ao quitar a parcela, o status será atualizado para "Quitada". Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={quitarMutation.isPending}
+              className="dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeQuitarParcela}
+              disabled={quitarMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800"
+            >
+              {quitarMutation.isPending ? 'Quitando...' : 'Quitar Mesmo'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

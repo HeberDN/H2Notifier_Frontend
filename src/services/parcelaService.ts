@@ -150,9 +150,14 @@ export const parcelaService = {
   deleteParcela: async (id: number): Promise<ApiResponse<null>> => {
     try {
       const response = await api.delete<ApiResponse<null>>(`/parcelas/${id}`);
-      // A API retorna 204 No Content para delete, então 'data' pode ser nulo.
-      // Retornamos um objeto de sucesso consistente ou null se a API não retorna nada.
-      return response.data || { success: true, message: 'Parcela deletada com sucesso.', data: null };
+      if (response.status === 204){
+        return {
+          success: true,
+          message: 'Parcela deletada com sucesso',
+          data: null
+        };
+      }
+      return response.data as ApiResponse<null>;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
         throw new Error(error.response.data.message || `Erro ao deletar parcela com ID ${id}`);

@@ -86,7 +86,7 @@ export const useDeletePessoa = () => {
     mutationFn: async (id: number) => {
       const response = await pessoaService.deletePessoa(id);
       if (!response.success) {
-        throw new Error(response.message || `Falha ao excluir pessoa com ID ${id}.`);
+        throw new Error(response.message || `test Falha ao excluir pessoa com ID ${id}.`);
       }
     },
     onSuccess: () => {
