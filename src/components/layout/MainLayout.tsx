@@ -24,7 +24,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               <Link to="/parcelas" className="hover:text-blue-200 transition-colors">Parcelas</Link>
             </li>
             <li>
-              <Link to="/notificacoes" className="hover:text-blue-200 transition-colors">Notificacoes</Link>
+              <Link to="/notificacoes" className="hover:text-blue-200 transition-colors">Notificações</Link>
+            </li>
+            <li>
+              <Link to="/mensagens" className="hover:text-blue-200 transition-colors">Mensagens</Link>
             </li>
             {/* Adicione outros links aqui */}
           </ul>

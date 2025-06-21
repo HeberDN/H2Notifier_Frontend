@@ -6,6 +6,7 @@ import ParcelaList from '../pages/ParcelaList';
 import PessoaList from '../features/pessoas/components/PessoaList';
 import Notificacoes from '../pages/Notificacoes';
 import MainLayout from '../components/layout/MainLayout';
+import MensagemList from '../pages/MensagemList';
 
 const AppRoutes = () => {
   return (
@@ -16,6 +17,7 @@ const AppRoutes = () => {
         <Route path="/pessoas" element={<MainLayout><PessoaList /></MainLayout>} />
         <Route path="/parcelas" element={<MainLayout><ParcelaList /></MainLayout>} />
         <Route path="/notificacoes" element={<MainLayout><Notificacoes /></MainLayout>}/>
+        <Route path="/mensagens" element={<MainLayout><MensagemList/></MainLayout>}/>
         {/* Adicione outras rotas aqui, sempre envolvendo com MainLayout */}
         {/* <Route path="/notificacoes-manuais" element={<MainLayout><NotificacaoManual /></MainLayout>} /> */}
         {/* <Route path="/mensagens-templates" element={<MainLayout><MensagensTemplates /></MainLayout>} /> */}
